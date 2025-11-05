@@ -10,3 +10,6 @@ MTA_Bus_Route_Segment_Speeds__Beginning_2025_20251028.csv
 # Geojson files
 geo_data_converted.geojson
 *.geojson
+
+# html files
+*.html
