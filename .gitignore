@@ -13,3 +13,6 @@ geo_data_converted.geojson
 
 # html files
 *.html
+
+# Backup files
+Backup*
