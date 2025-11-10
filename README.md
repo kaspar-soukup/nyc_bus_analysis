@@ -30,14 +30,15 @@ python main.py --process
 
 ### Launch the Streamlit App
 ```bash
-streamlit run app_cbd_analysis.py
+streamlit run app.py
 ```
 Access at: http://localhost:8501
 
 The app shows:
-- Speed graphs (2023 - Sept 2025) with 3-month rolling averages
-- DiD analysis results (3-month and 6-month comparisons)
-- Fastest and slowest bus routes in the CBD
+- **Overall Trends**: Speed graphs (2023-2025) with 3-month rolling averages
+- **CBD vs Non-CBD**: Compare speeds inside and outside congestion pricing zone
+- **Individual Routes**: Analyze specific bus routes over time
+- **Summary Statistics**: Average speeds by day type and location
 
 ### Explore the Analysis Notebook
 Open `notebooks/Analysis.ipynb` for detailed statistical analysis, visualizations, and interpretations.
@@ -49,7 +50,7 @@ Bus Project Data Science/
 ├── README.md                  # This file
 ├── requirements.txt          # Python dependencies
 ├── main.py                   # Main data pipeline (fetch → process → visualize)
-├── app_cbd_analysis.py       # Streamlit dashboard
+├── app.py                    # Streamlit dashboard (visualization only)
 │
 ├── Data/                     # Data directory
 │   ├── raw/                  # Original MTA data from API
@@ -128,22 +129,35 @@ The pipeline (`main.py`) performs three main steps:
 
 ## 🎨 Streamlit Dashboard
 
-`app_cbd_analysis.py` provides an interactive web interface:
+`app.py` provides an interactive web interface for exploring bus speed data:
 
 **Features:**
-- **Speed Graphs**: Weekday/weekend trends with rolling averages and pricing period highlighted
-- **DiD Results**: Both 3-month and 6-month coefficients with p-values and R²
-- **Route Rankings**: Fastest and slowest CBD bus routes (current vs. year-ago)
+- **Overall View**: Combined speed trends for all routes with CBD vs Non-CBD comparison
+- **Individual Route View**: Select and compare specific bus routes
+- **Interactive Filters**:
+  - Show CBD segments only
+  - Toggle 3-month rolling averages
+  - Weekday vs Weekend comparisons
+- **Visual Indicators**: Congestion pricing start date marked on all graphs
+- **Summary Statistics**: Average speeds, standard deviations by location and day type
 
-**Performance**: Loads in 2-3 seconds (vs. 30-60 seconds without pre-processing!)
+**Performance**: Loads in 2-3 seconds using pre-processed data!
+
+**Note**: For statistical analysis (DiD regression), see `notebooks/Analysis.ipynb`
 
 ## 📈 Key Findings
 
-The analysis uses two DiD specifications:
+The analysis uses Difference-in-Differences (DiD) methodology to estimate the causal effect of congestion pricing:
+
 - **3-Month DiD**: Compares Q4 2023/2024 to Q1 2024/2025
 - **6-Month DiD**: Compares Jul-Dec 2023/2024 to Jan-Jun 2024/2025
 
-Results show the causal effect of congestion pricing on CBD bus speeds during pricing hours.
+**Analysis focuses on:**
+- CBD segments only (geofence-based classification)
+- Pricing hours only (weekday 5am-9pm, weekend 9am-9pm)
+- Route fixed effects to control for inherent route differences
+
+For detailed results and statistical significance, see `notebooks/Analysis.ipynb`.
 
 ## 🛠️ Technical Details
 
