@@ -101,7 +101,7 @@ if view_type == "Overall (All Routes Combined)":
             
             # Add rolling average if enabled
             if show_rolling_avg:
-                rolling_avg = subset['avg_speed_mph'].rolling(window=3, center=True).mean()
+                rolling_avg = subset['avg_speed_mph'].rolling(window=3).mean()
                 ax.plot(subset['year_month'], rolling_avg, 
                        label=f'{label} (3-mo avg)', 
                        color=color, linewidth=2.5, alpha=1.0)
