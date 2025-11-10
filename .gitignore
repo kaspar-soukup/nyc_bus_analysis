@@ -1,11 +1,15 @@
 # env files
 .env
 
-# csv files
+# csv files - exclude all by default
 *.csv
 geo_json.csv
 Manhattan_Bus_data.csv
 MTA_Bus_Route_Segment_Speeds__Beginning_2025_20251028.csv
+
+# BUT allow small processed files needed for Streamlit app
+!Data/processed/speed_overall.csv
+!Data/processed/speed_monthly.csv
 
 # Geojson files
 geo_data_converted.geojson
