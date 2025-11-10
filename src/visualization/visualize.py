@@ -26,24 +26,27 @@ def plot_speed_by_hour_and_bus_type(segment_speed_df: pd.DataFrame,
     Returns:
     - matplotlib Figure object
     """
-    figs, axes = plt.subplots(2, 2, figsize=figsize, sharex=True, sharey=True)
-    options = list(segment_speed_df["route_type"].unique())
+    fig, axes = plt.subplots(2, 2, figsize=figsize, sharex=True, sharey=True)
+    options = list(segment_speed_df["route_type"].dropna().unique())[:4]
     hours = list(range(24))
 
     for i, ax in enumerate(axes.flatten()):
         if i < len(options):
             condition = options[i]
             subset = segment_speed_df[segment_speed_df["route_type"] == condition]
-            subset = subset.groupby(["hour_of_day"])[["weight_travel_time", "weight_distance"]].sum().reindex(hours)
-            subset["avg_speed"] = subset["weight_distance"] / subset["weight_travel_time"]
-            subset["avg_speed"].plot(kind="bar", ax=ax)
-            ax.set_title(f"Hourly avg. speed for {condition}")
+            if len(subset) > 0:
+                grouped = subset.groupby(["hour_of_day"])[["weight_travel_time", "weight_distance"]].sum()
+                grouped = grouped.reindex(hours, fill_value=1)  # Avoid division by zero
+                grouped["avg_speed"] = grouped["weight_distance"] / grouped["weight_travel_time"].replace(0, 1)
+                grouped["avg_speed"].plot(kind="line", ax=ax, marker='o')
+                ax.set_title(f"Hourly avg. speed for {condition}")
+                ax.set_ylabel("Speed (mph)")
+                ax.grid(True, alpha=0.3)
         else:
             ax.set_visible(False)
-            continue
 
     plt.tight_layout()
-    return figs
+    return fig
 
 
 def plot_speed_by_hour_and_weekday(segment_speed_df: pd.DataFrame, 
@@ -58,7 +61,7 @@ def plot_speed_by_hour_and_weekday(segment_speed_df: pd.DataFrame,
     Returns:
     - matplotlib Figure object
     """
-    figs, axes = plt.subplots(4, 2, figsize=figsize, sharex=True, sharey=True)
+    fig, axes = plt.subplots(4, 2, figsize=figsize, sharex=True, sharey=True)
     weekday_options = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     hours = list(range(24))
 
@@ -66,15 +69,20 @@ def plot_speed_by_hour_and_weekday(segment_speed_df: pd.DataFrame,
         if i < len(weekday_options):
             condition = weekday_options[i]
             subset = segment_speed_df[segment_speed_df["day_of_week"] == condition]
-            subset = subset.groupby(["hour_of_day"])[["weight_travel_time", "weight_distance"]].sum().reindex(hours)
-            subset["avg_speed"] = subset["weight_distance"] / subset["weight_travel_time"]
-            subset["avg_speed"].plot(kind="bar", ax=ax)
-            ax.set_title(f"Hourly avg. speed for {condition}")
+            if len(subset) > 0:
+                grouped = subset.groupby(["hour_of_day"])[["weight_travel_time", "weight_distance"]].sum()
+                grouped = grouped.reindex(hours, fill_value=1)
+                grouped["avg_speed"] = grouped["weight_distance"] / grouped["weight_travel_time"].replace(0, 1)
+                grouped["avg_speed"].plot(kind="line", ax=ax, marker='o')
+                ax.set_title(f"{condition}")
+                ax.set_ylabel("Speed (mph)")
+                ax.grid(True, alpha=0.3)
         else:
             ax.set_visible(False)
 
+    plt.suptitle("Average Speed by Hour and Weekday", fontsize=14, y=1.00)
     plt.tight_layout()
-    return figs
+    return fig
 
 
 def plot_speed_comparison_by_year(segment_speed_df: pd.DataFrame, 
@@ -241,17 +249,17 @@ def plot_vehicles_entering_manhattan(vehicles_entering_manhattan: pd.DataFrame,
     - matplotlib Figure object
     """
     grouped_vehicles_entering = vehicles_entering_manhattan.groupby(
-        ["Year", "Month", "Day", "Weekend", "Hour"]
+        ["year", "month", "day", "weekend", "hour"]
     )[["inflow", "outflow", "change"]].sum().reset_index()
 
-    vehicles_entering_manhattan_weekend = grouped_vehicles_entering[grouped_vehicles_entering["Weekend"] == 1]
-    vehicles_entering_manhattan_weekday = grouped_vehicles_entering[grouped_vehicles_entering["Weekend"] == 0]
+    vehicles_entering_manhattan_weekend = grouped_vehicles_entering[grouped_vehicles_entering["weekend"] == 1]
+    vehicles_entering_manhattan_weekday = grouped_vehicles_entering[grouped_vehicles_entering["weekend"] == 0]
 
     fig, axes = plt.subplots(1, 2, figsize=figsize, sharey=True)
 
     # Weekday
     weekday_avg = vehicles_entering_manhattan_weekday.groupby(
-        ["Year", "Hour"]
+        ["year", "hour"]
     )[["inflow", "outflow", "change"]].mean().unstack(level=0)
     weekday_avg.plot(ax=axes[0])
     axes[0].axvspan(5, 20, color="lightblue", alpha=0.3, label="Congestion Pricing Hours")
@@ -264,7 +272,7 @@ def plot_vehicles_entering_manhattan(vehicles_entering_manhattan: pd.DataFrame,
 
     # Weekend
     weekend_avg = vehicles_entering_manhattan_weekend.groupby(
-        ["Year", "Hour"]
+        ["year", "hour"]
     )[["inflow", "outflow", "change"]].mean().unstack(level=0)
     weekend_avg.plot(ax=axes[1])
     axes[1].axvspan(9, 20, color="lightblue", alpha=0.3, label="Congestion Pricing Hours")
@@ -335,7 +343,7 @@ def plot_cbd_entries_by_month(vehicles_entering_cbd: pd.DataFrame,
     """
     fig = plt.figure(figsize=figsize)
     vehicles_entering_cbd.groupby(
-        ["Year", "Month", "Weekend"]
+        ["year", "month", "weekend"]
     )["sum_crz_entries"].sum().unstack(level=2).plot(kind="bar", figsize=figsize, stacked=True)
     
     return fig
@@ -357,14 +365,14 @@ def plot_cbd_entries_by_hour(vehicles_entering_cbd_weekday: pd.DataFrame,
     """
     fig, axes = plt.subplots(1, 2, figsize=figsize, sharey=True)
 
-    vehicles_entering_cbd_weekday.groupby("Hour")["sum_crz_entries"].mean().plot(kind="line", ax=axes[0])
+    vehicles_entering_cbd_weekday.groupby("hour")["sum_crz_entries"].mean().plot(kind="line", ax=axes[0])
     axes[0].axvspan(5, 20, color="lightblue", alpha=0.3, label="Congestion Pricing Hours")
     axes[0].set_ylabel("Average Number of Vehicles Entering CBD")
     axes[0].set_xlabel("Hour of Day")
     axes[0].set_title("Weekday: Average Vehicles Entering CBD")
     axes[0].legend(loc="lower right")
 
-    vehicles_entering_cbd_weekend.groupby("Hour")["sum_crz_entries"].mean().plot(kind="line", ax=axes[1])
+    vehicles_entering_cbd_weekend.groupby("hour")["sum_crz_entries"].mean().plot(kind="line", ax=axes[1])
     axes[1].axvspan(9, 20, color="lightblue", alpha=0.3, label="Congestion Pricing Hours")
     axes[1].set_ylabel("Average Number of Vehicles Entering CBD")
     axes[1].set_xlabel("Hour of Day")

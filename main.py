@@ -1,22 +1,26 @@
 """
 Main pipeline script for NYC Bus Analysis.
 
-This script orchestrates the entire data science pipeline:
+This script now focuses on the core stages that populate the processed
+datasets and figures:
 1. Data ingestion
 2. Data processing and feature engineering
 3. Visualization
-4. Model training
 
 Usage:
-    python main.py --fetch-data --process --visualize --model
+    python main.py --fetch-data --process --visualize
     python main.py --visualize  # Only run visualizations
-    python main.py --all  # Run full pipeline
+    python main.py --all  # Run ingestion + processing + visualization
 """
 
 import argparse
 import os
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -30,17 +34,12 @@ from src.features.build_features import (
     prepare_ridership_data,
     clean_vehicle_crossing_data,
     clean_crz_entries_data,
-    filter_cbd_segments
+    filter_cbd_segments,
+    add_cbd_classification,
+    create_speed_monthly_aggregated,
+    create_speed_overall_aggregated
 )
 from src.visualization.visualize import save_all_plots
-from src.models.train_model import (
-    prepare_regression_data,
-    train_linear_regression,
-    train_statsmodels_ols,
-    save_model_results
-)
-
-
 def fetch_data(app_token: str):
     """Fetch or load all data."""
     print("=" * 80)
@@ -94,13 +93,26 @@ def process_data(data: dict):
         data['cbd_geojson_area_2024']
     )
     
+    # Add CBD classification to full segment speed data
+    print("\nAdding CBD classification to segment speed data...")
+    geofence_path = RAW_DATA_DIR / 'MTA_Central_Business_District_Geofence__Beginning_June_2024_20251105.geojson'
+    segment_speed_df = add_cbd_classification(segment_speed_df, str(geofence_path))
+    
+    # Create aggregated datasets
+    print("\nCreating aggregated datasets...")
+    speed_monthly = create_speed_monthly_aggregated(segment_speed_df)
+    speed_overall = create_speed_overall_aggregated(speed_monthly)
+    
     # Save processed data
     print("\nSaving processed data...")
     os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
     segment_speed_df.to_csv(PROCESSED_DATA_DIR / 'segment_speed_processed.csv', index=False)
+    bus_speed_df.to_csv(PROCESSED_DATA_DIR / 'bus_speed_processed.csv', index=False)
     ridership_data.to_csv(PROCESSED_DATA_DIR / 'ridership_processed.csv', index=False)
     vehicles_entering_manhattan.to_csv(PROCESSED_DATA_DIR / 'manhattan_crossings_processed.csv', index=False)
     vehicles_entering_cbd.to_csv(PROCESSED_DATA_DIR / 'cbd_entries_processed.csv', index=False)
+    speed_monthly.to_csv(PROCESSED_DATA_DIR / 'speed_monthly.csv', index=False)
+    speed_overall.to_csv(PROCESSED_DATA_DIR / 'speed_overall.csv', index=False)
     
     print("✓ Data processing complete!")
     
@@ -140,49 +152,13 @@ def create_visualizations(processed_data: dict):
     )
     
     print("\n✓ Visualizations complete!")
-
-
-def train_models(processed_data: dict):
-    """Train and evaluate regression models."""
-    print("\n" + "=" * 80)
-    print("STEP 4: MODEL TRAINING")
-    print("=" * 80)
-    
-    print("\nPreparing regression data...")
-    X, y = prepare_regression_data(
-        segment_speed_df=processed_data['segment_speed_df'],
-        ridership_data=processed_data['ridership_data'],
-        vehicles_entering_manhattan=processed_data['vehicles_entering_manhattan'],
-        vehicles_entering_cbd=processed_data['vehicles_entering_cbd'],
-        cbd_vehicle_speeds_2023_2025=processed_data['cbd_vehicle_speeds'],
-        cbd_bus_routes_2025=processed_data['cbd_bus_routes']
-    )
-    
-    print("\nTraining Linear Regression model...")
-    model, metrics = train_linear_regression(X, y)
-    
-    print("\nTraining OLS model with statsmodels...")
-    try:
-        model_sm = train_statsmodels_ols(X, y)
-    except Exception as e:
-        print(f"Statsmodels OLS failed: {e}")
-        print("Skipping statsmodels analysis...")
-        model_sm = None
-    
-    print("\nSaving model results...")
-    save_model_results(model, metrics, X.columns.tolist(), output_dir=str(REPORTS_DIR))
-    
-    print("\n✓ Model training complete!")
-
-
 def main():
     """Main function to run the pipeline."""
     parser = argparse.ArgumentParser(description='NYC Bus Analysis Pipeline')
     parser.add_argument('--fetch-data', action='store_true', help='Fetch data from API')
     parser.add_argument('--process', action='store_true', help='Process and clean data')
     parser.add_argument('--visualize', action='store_true', help='Generate visualizations')
-    parser.add_argument('--model', action='store_true', help='Train models')
-    parser.add_argument('--all', action='store_true', help='Run full pipeline')
+    parser.add_argument('--all', action='store_true', help='Run ingestion, processing, and visualization')
     
     args = parser.parse_args()
     
@@ -208,11 +184,8 @@ def main():
     else:
         # Load existing data if not fetching
         print("\nLoading existing data...")
-        from src.data.make_dataset import (
-            load_stop_data, 
-            load_cbd_geojson_data
-        )
         import pandas as pd
+        import geopandas as gpd
         
         data = {
             'bus_speed_seg_2025': pd.read_csv(RAW_DATA_DIR / 'MTA_Bus_Route_Segment_Speeds_Beginning_2025_20251105.csv'),
@@ -225,8 +198,8 @@ def main():
             'crz_entries_2023_2025': pd.read_csv(RAW_DATA_DIR / 'MTA_CRZ_Hourly_Entries_2023_2025_20251105.csv'),
             'cbd_vehicle_speeds_2023_2025': pd.read_csv(RAW_DATA_DIR / 'MTA_CBD_Vehicle_Speeds_2023_2025_20251105.csv'),
             'cbd_bus_routes_2025': pd.read_csv(RAW_DATA_DIR / 'MTA_CBD_Bus_Routes_2025_20251105.csv'),
-            'stop_data': load_stop_data(str(RAW_DATA_DIR / 'manhattan_stops_flat.csv')),
-            'cbd_geojson_area_2024': load_cbd_geojson_data(str(RAW_DATA_DIR / 'MTA_Central_Business_District_Geofence__Beginning_June_2024_20251105.geojson'))
+            'stop_data': pd.read_csv(RAW_DATA_DIR / 'manhattan_stops_flat.csv'),
+            'cbd_geojson_area_2024': gpd.read_file(RAW_DATA_DIR / 'MTA_Central_Business_District_Geofence__Beginning_June_2024_20251105.geojson')
         }
     
     if args.all or args.process:
@@ -250,15 +223,11 @@ def main():
     if args.all or args.visualize:
         create_visualizations(processed_data)
     
-    if args.all or args.model:
-        train_models(processed_data)
-    
     print("\n" + "=" * 80)
     print("PIPELINE COMPLETE!")
     print("=" * 80)
     print(f"\nProcessed data saved to: {PROCESSED_DATA_DIR}")
     print(f"Visualizations saved to: {FIGURES_DIR}")
-    print(f"Model results saved to: {REPORTS_DIR}")
 
 
 if __name__ == "__main__":
