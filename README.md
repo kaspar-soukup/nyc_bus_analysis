@@ -211,6 +211,20 @@ See `requirements.txt` for complete list.
 - Check `reports/` for saved figures and model outputs
 - Notebook kernel should be restarted after running pipeline for fresh data
 
+## 🚀 Deployment
+
+### Streamlit Cloud
+
+The app is deployment-ready! The repository includes the minimal processed data files needed (`speed_overall.csv` and `speed_monthly.csv` - only ~344KB total).
+
+**To deploy:**
+1. Go to [share.streamlit.io](https://share.streamlit.io)
+2. Connect your GitHub repository
+3. Set main file path to: `app.py`
+4. Deploy!
+
+**Note:** Large raw data files (>1GB) are excluded from the repository via `.gitignore`. The Streamlit app only needs the small aggregated files which are included.
+
 ## 🤝 Contributing
 
 When making changes:
