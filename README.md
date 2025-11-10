@@ -1,228 +1,210 @@
 # NYC Bus Analysis Project
 
-A data science project analyzing NYC MTA bus performance, congestion pricing impacts, and traffic patterns in Manhattan.
+A data science project analyzing NYC MTA bus performance, congestion pricing impacts, and traffic patterns in Manhattan using geofence-based CBD classification and Difference-in-Differences (DiD) analysis.
 
-## Project Structure
+## 🎯 Project Overview
+
+This project analyzes the impact of NYC's congestion pricing (started January 5, 2025) on bus speeds in the Central Business District (CBD). Key features:
+
+- **Geofence-based CBD Classification**: Uses actual geographic boundaries instead of route lists
+- **Pre-processed Data Pipeline**: All data cleaning and aggregation happens in one place
+- **Interactive Streamlit Dashboard**: Real-time visualization of analysis results
+- **Difference-in-Differences Analysis**: 3-month and 6-month comparisons to measure congestion pricing effects
+
+## 📊 Quick Start
+
+### Run the Full Pipeline
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Set your MTA API token (optional, for fetching new data)
+export APP_TOKEN='your_token_here'
+
+# Run the complete pipeline (fetch, process, visualize)
+python main.py --all
+
+# Or just process existing data
+python main.py --process
+```
+
+### Launch the Streamlit App
+```bash
+streamlit run app_cbd_analysis.py
+```
+Access at: http://localhost:8501
+
+The app shows:
+- Speed graphs (2023 - Sept 2025) with 3-month rolling averages
+- DiD analysis results (3-month and 6-month comparisons)
+- Fastest and slowest bus routes in the CBD
+
+### Explore the Analysis Notebook
+Open `notebooks/Analysis.ipynb` for detailed statistical analysis, visualizations, and interpretations.
+
+## 🏗️ Project Structure
 
 ```
 Bus Project Data Science/
-├── README.md                   # This file
-├── SUGGESTIONS.md             # Code improvement recommendations
-├── requirements.txt           # Python dependencies
-├── main.py                    # Main pipeline orchestration script
+├── README.md                  # This file
+├── requirements.txt          # Python dependencies
+├── main.py                   # Main data pipeline (fetch → process → visualize)
+├── app_cbd_analysis.py       # Streamlit dashboard
 │
-├── data/                      # Data directory
-│   ├── raw/                   # Original, immutable data
-│   ├── processed/             # Cleaned, transformed data
-│   └── interim/               # Intermediate processing results
+├── Data/                     # Data directory
+│   ├── raw/                  # Original MTA data from API
+│   ├── processed/            # Pipeline output - ready for analysis
+│   │   ├── segment_speed_processed.csv    # With is_cbd_segment column
+│   │   ├── speed_monthly.csv              # Monthly aggregates by route
+│   │   ├── speed_overall.csv              # Overall monthly aggregates
+│   │   ├── bus_speed_processed.csv
+│   │   ├── ridership_processed.csv
+│   │   └── cbd_entries_processed.csv
+│   └── interim/              # Intermediate processing (if needed)
 │
-├── notebooks/                 # Jupyter notebooks for exploration
-│   └── New_Bus_Analysis.ipynb # Original analysis notebook
+├── notebooks/                # Jupyter notebooks
+│   └── Analysis.ipynb        # Main analysis notebook (USE THIS)
 │
-├── src/                       # Source code modules
-│   ├── __init__.py
-│   ├── config.py             # Configuration and constants
-│   │
-│   ├── data/                 # Data fetching and loading
-│   │   ├── __init__.py
-│   │   └── make_dataset.py   # API calls and data ingestion
-│   │
-│   ├── features/             # Feature engineering and data processing
-│   │   ├── __init__.py
-│   │   └── build_features.py # Data cleaning and transformations
-│   │
-│   ├── models/               # Model training and evaluation
-│   │   ├── __init__.py
-│   │   └── train_model.py    # Regression models
-│   │
-│   └── visualization/        # Plotting and visualization
-│       ├── __init__.py
-│       └── visualize.py      # All plotting functions
+├── src/                      # Source code modules
+│   ├── config.py            # Configuration and constants
+│   ├── data/
+│   │   └── make_dataset.py  # API calls and data ingestion
+│   ├── features/
+│   │   └── build_features.py # Data cleaning, CBD classification, aggregation
+│   ├── models/
+│   │   └── train_model.py   # Statistical models
+│   └── visualization/
+│       └── visualize.py     # Plotting functions
 │
-└── reports/                  # Generated analysis outputs
-    ├── figures/              # Generated plots and charts
-    ├── model_metrics.csv     # Model performance metrics
-    └── feature_importance.csv # Model coefficients
+└── reports/                 # Generated outputs
+    ├── figures/             # Saved plots
+    └── *.csv               # Model results and metrics
 ```
 
-## Setup
+## 🔄 Data Pipeline
 
-### 1. Install Dependencies
+The pipeline (`main.py`) performs three main steps:
 
-```bash
-pip install -r requirements.txt
-```
+### 1. Data Ingestion (`--fetch-data`)
+- Fetches data from NYC MTA Open Data API
+- Downloads: segment speeds, bus speeds, ridership, crossings, CBD routes, geofence
+- Saves raw data to `Data/raw/`
 
-### 2. Set Environment Variables
+### 2. Data Processing (`--process`) ⭐ **Core Pipeline**
+- **Cleans and merges** datasets (2023-2024 + 2025 data)
+- **CBD Classification**: Uses CBD geofence GeoJSON to classify segments
+  - Calculates segment midpoints from start/end coordinates
+  - Checks if midpoint falls within CBD polygon
+  - Adds `is_cbd_segment` boolean column
+- **Creates Aggregations**:
+  - `speed_monthly.csv` - Monthly aggregates by route (4,000+ rows)
+  - `speed_overall.csv` - Overall monthly aggregates (130+ rows)
+- **Adds Temporal Features**: hour, weekend, congestion_pricing_timeframe
+- Outputs to `Data/processed/`
 
-Create a `.env` file or export your Socrata API token:
+**Why this matters**: All downstream analysis (notebook + Streamlit app) uses the same pre-processed data, ensuring consistency.
 
-```bash
-export APP_TOKEN='your_socrata_api_token'
-```
+### 3. Visualization (`--visualize`)
+- Generates plots for speed trends, ridership, crossings
+- Saves to `reports/figures/`
 
-You can get a Socrata API token from: https://data.ny.gov/
+## 📓 Analysis Notebook
 
-### 3. Ensure Data Directory Structure
+`notebooks/Analysis.ipynb` contains:
+- **Data Loading**: Uses pre-processed CSVs from pipeline
+- **Exploratory Analysis**: Speed trends, seasonality, day-of-week patterns
+- **Geofence Visualization**: Maps showing CBD boundaries and bus routes
+- **Difference-in-Differences (DiD)**:
+  - 3-month analysis (Oct-Dec vs Jan-Mar comparisons)
+  - 6-month analysis (Jul-Dec vs Jan-Jun comparisons)
+  - Controls for route fixed effects
+  - Filters to pricing hours only (weekday 5am-9pm, weekend 9am-9pm)
+- **Statistical Tests**: Significance testing, confidence intervals
+- **Interpretations**: What the results mean for policy
 
-The pipeline will automatically create necessary directories, but your raw data should be in:
-- `data/raw/` (or `Data/` for existing files)
+**To run**: 
+1. First run `python main.py --process` to generate processed data
+2. Open notebook and run all cells
 
-## Usage
+## 🎨 Streamlit Dashboard
 
-### Running the Complete Pipeline
+`app_cbd_analysis.py` provides an interactive web interface:
 
-```bash
-# Run the full pipeline (fetch, process, visualize, model)
-python main.py --all
+**Features:**
+- **Speed Graphs**: Weekday/weekend trends with rolling averages and pricing period highlighted
+- **DiD Results**: Both 3-month and 6-month coefficients with p-values and R²
+- **Route Rankings**: Fastest and slowest CBD bus routes (current vs. year-ago)
 
-# Or run individual steps:
-python main.py --fetch-data    # Fetch data from API
-python main.py --process       # Process and clean data
-python main.py --visualize     # Generate visualizations
-python main.py --model         # Train models
-```
+**Performance**: Loads in 2-3 seconds (vs. 30-60 seconds without pre-processing!)
 
-### Using Individual Modules
+## 📈 Key Findings
 
-You can also import and use individual modules in your own scripts or notebooks:
+The analysis uses two DiD specifications:
+- **3-Month DiD**: Compares Q4 2023/2024 to Q1 2024/2025
+- **6-Month DiD**: Compares Jul-Dec 2023/2024 to Jan-Jun 2024/2025
 
+Results show the causal effect of congestion pricing on CBD bus speeds during pricing hours.
+
+## 🛠️ Technical Details
+
+### CBD Classification Method
+- **Input**: Segment start/end lat/lon coordinates
+- **Process**: Calculate midpoint, check containment in CBD geofence polygon
+- **Library**: Shapely for geometric operations (vectorized for performance)
+- **Time**: ~30-60 seconds for 2.2M rows
+
+### Weighted Speed Calculation
 ```python
-# Data ingestion
-from src.data.make_dataset import fetch_all_data
-
-# Feature engineering
-from src.features.build_features import clean_segment_speed_data
-
-# Visualization
-from src.visualization.visualize import plot_speed_comparison_by_year
-
-# Modeling
-from src.models.train_model import train_linear_regression
+weight_distance = road_distance × bus_trip_count
+weight_travel_time = average_travel_time × bus_trip_count
+avg_speed_mph = sum(weight_distance) / sum(weight_travel_time)
 ```
 
-## Data Sources
-
-All data comes from the NYC Open Data portal (data.ny.gov):
-
-1. **Bus Segment Speeds** - Speed data for specific route segments
-2. **Bus Speeds** - Overall bus route speeds
-3. **Hourly Ridership** - Passenger counts by hour
-4. **Bridge/Tunnel Crossings** - Vehicle counts entering Manhattan
-5. **Congestion Relief Zone (CRZ) Entries** - Vehicles entering CBD
-6. **CBD Vehicle Speeds** - Average speeds in Central Business District
-7. **CBD Bus Routes** - Bus routes operating in CBD
-8. **Stop Data** - Bus stop locations and metadata
-9. **CBD Geofence** - Geographic boundary of CBD
-
-## Analysis Components
-
-### 1. Data Ingestion (`src/data/make_dataset.py`)
-- Fetches data from Socrata API
-- Implements caching to avoid redundant API calls
-- Handles pagination for large datasets
-- Loads local files when available
-
-### 2. Feature Engineering (`src/features/build_features.py`)
-- Cleans and standardizes column names
-- Parses timestamps and creates temporal features
-- Calculates weighted averages for speed metrics
-- Interpolates missing bus stops
-- Filters data by geographic boundaries (CBD)
-
-### 3. Visualization (`src/visualization/visualize.py`)
-- Speed trends by hour, day, and bus type
-- Year-over-year comparisons (2023-2025)
-- CBD-specific analysis
-- Vehicle crossing patterns
-- Ridership trends
-- Interactive Folium maps
-
-### 4. Modeling (`src/models/train_model.py`)
-- Linear regression for speed prediction
-- Feature importance analysis
-- Model evaluation metrics
-- Statsmodels OLS for statistical inference
-
-## Key Findings (From Original Notebook)
-
-- Analysis of Manhattan bus speeds from 2023-2025
-- Impact of congestion pricing on bus speeds
-- Comparison of weekday vs weekend patterns
-- CBD-specific speed improvements
-- Correlation between ridership and vehicle entries
-
-## Configuration
-
-All configuration parameters are centralized in `src/config.py`:
-- Dataset IDs and API endpoints
-- File paths and naming patterns
-- Analysis parameters (date ranges, filters)
-- Visualization settings
-- Model hyperparameters
-
-## Code Quality
-
-Your original code has been preserved and refactored into a production-ready pipeline:
-- ✅ Modular structure with clear separation of concerns
-- ✅ Reusable functions with consistent interfaces
-- ✅ Comprehensive docstrings
-- ✅ Centralized configuration
-- ✅ Type hints where applicable
-
-See `SUGGESTIONS.md` for detailed recommendations on further improvements.
-
-## Output
-
-### Processed Data
-- `data/processed/segment_speed_processed.csv`
-- `data/processed/ridership_processed.csv`
-- `data/processed/manhattan_crossings_processed.csv`
-- `data/processed/cbd_entries_processed.csv`
-
-### Visualizations
-- `reports/figures/*.png` - All generated plots
-
-### Model Results
-- `reports/linear_regression_model.pkl` - Trained model
-- `reports/model_metrics.csv` - Performance metrics
-- `reports/feature_importance.csv` - Feature coefficients
-
-## Development
-
-### Running Tests (Future)
-```bash
-pytest tests/
+### DiD Model Specification
+```python
+avg_speed_mph ~ treatment + post + did + C(route_id)
 ```
+Where:
+- `treatment = 1` only for Jan-Mar 2025 (or Jan-Jun 2025 in 6-month)
+- `post = 1` for second half of periods (2024 and 2025)
+- `did = treatment × post` (the coefficient of interest)
+- Route fixed effects control for inherent route differences
 
-### Linting (Future)
-```bash
-flake8 src/
-black src/
-```
+## 🔧 Configuration
 
-### Adding New Features
-1. Add new functions to appropriate module in `src/`
-2. Update `config.py` if new parameters needed
-3. Update `main.py` if pipeline integration required
-4. Add tests in `tests/`
+Edit `src/config.py` to change:
+- Data directories
+- API endpoints  
+- Date ranges
+- Analysis parameters
 
-## Contributing
+## 📦 Dependencies
+
+Key packages:
+- `pandas`, `numpy` - Data manipulation
+- `geopandas`, `shapely` - Geospatial operations
+- `matplotlib` - Visualization
+- `statsmodels` - Regression analysis
+- `streamlit` - Web dashboard
+- `sodapy` - MTA API client
+
+See `requirements.txt` for complete list.
+
+## 💡 Tips
+
+- Run `python main.py --process` after updating raw data
+- Streamlit app auto-reloads when files change during development
+- Check `reports/` for saved figures and model outputs
+- Notebook kernel should be restarted after running pipeline for fresh data
+
+## 🤝 Contributing
 
 When making changes:
-1. Follow the existing code structure
-2. Add docstrings to all functions
-3. Update this README if adding major features
-4. Consider the suggestions in `SUGGESTIONS.md`
-
-## License
-
-[Your License Here]
-
-## Contact
-
-[Your Contact Information]
+1. Update pipeline functions in `src/features/build_features.py`
+2. Re-run `python main.py --process` to regenerate processed data
+3. Verify both notebook and Streamlit app produce consistent results
+4. Update this README for major feature additions
 
 ---
 
-**Note**: This project structure follows the [Cookiecutter Data Science](https://drivendata.github.io/cookiecutter-data-science/) template, a standardized approach to organizing data science projects.
+**Note**: This project uses geofence-based CBD classification for more accurate geographic analysis compared to route-based methods.
